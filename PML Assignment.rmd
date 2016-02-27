@@ -1,0 +1,86 @@
+---
+title: "PML Assignment: Predict manner of exercise"
+author: "Tjad Clark"
+date: "February 21, 2016"
+output: html_document
+---
+
+## Introduction
+It has been noted that commonly research in how much on does a particular activity is quantified, however it is less often that the manner in which the exercise was done is classified from worse to better.
+
+In this research, we build a prediction model based on [Human Activity Recognition](http://groupware.les.inf.puc-rio.br/har) data collected by 6 participants wearing accelerometers in 4 parts of the body during exercise namely,  belt, forearm, arm, and dumbell. The prediction model will be used to classify the different manner in which the exercise was performed, A,B,C,D,E where A is the exercise being performed correctly and the alternative classes being common mistakes made during the exercise.
+
+## Data cleaning
+We start off with 160 different variables of which 159 are potential covariates. First we clean the raw data by removing all columns with any missing values as to keep all of the observations without hindering the prediction model or biasing any of the predicted classes, whereby we are still left with 92 potential predictors. As we are only interested in the accelerometer data, we further remove the first 7 columns leaving 85 potential covariates.
+
+## Data partitioning
+
+In order to test our chosen prediction model we partition the data into a 70/30 training/test data set. The training set will be used to find our prediction model whilst the test data will be used for cross validation of our prediction model.
+
+## Prediction model
+Upon our training data, we first perform some pre processing on the data using the principal components analysis method. We find that in order to explain 95% of the variance, we will require about 27 components. Using our principal components we generate the training and test predictor values.
+
+Using the training predictor values, we train a random forest in order to obtain further multiple partitioning of the data which aggregates the generated decision trees.
+
+## Cross validation
+
+Using the generated test predictor values from  our principal component analysis, we then run predictions and compare those predictions in a confusion matrix. The confusion matrix shows us that we have a 97.9% accuracy with a 95% confidence(0.9751, 0.9826) as seen in Table.1 below. Our error rate being estimated at 2.39%
+
+## Conclusion
+
+We have successfully produced a prediction model with at least 97.9% accuaracy with 95% confidence which is generally considered a prediction model. In order to get extra accuracy we may want to explore using a higher set of principal components. 
+
+
+```{r Initialization}
+
+library('caret')
+
+```
+
+```{r Getting data, cache=T}
+download.file('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv', 'pml-training.csv', method = 'curl')
+```
+
+```{r Cleaning data, cache=T }
+raw_data <- read.csv('pml-training.csv')
+
+#Remove columns missing values
+selected_columns <- colnames(raw_data[colSums(is.na(raw_data)) == 0])
+
+#Remove first 7 columns (only want accelerometer values with the outcome)
+selected_columns <- selected_columns[8:length(selected_columns)]
+
+clean_data <- raw_data[,selected_columns]
+```
+
+```{r Preprocessing data}
+train_idx <- createDataPartition(y=clean_data$classe, p=0.7, list = F)
+
+train_data <- clean_data[train_idx,]
+test_data <- clean_data[-train_idx,]
+
+set.seed(58213)
+
+pre_proc <- preProcess(train_data, method='pca', pcaComp = 27)
+
+train_pc <- predict(pre_proc, train_data)
+
+test_pc <- predict(pre_proc, test_data)
+
+final_vars <- grep('PC\\d|classe', names(train_pc))
+
+```
+
+```{r Training prediction model, cache=T}
+fit <- train(classe ~ . , method="rf", data=train_pc[final_vars])
+
+```
+
+Table.1
+```{r Cross validation / analyse prediction model}
+
+predictions <- predict(fit, test_pc[final_vars])
+
+confusionMatrix(test_pc$classe, predictions)
+
+```
